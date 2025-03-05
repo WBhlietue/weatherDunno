@@ -1,0 +1,15 @@
+weather,temperature,water,wind,play
+sunny,hot,high,weak,no
+sunny,hot,high,force,no
+cloudy,hot,high,weak,yes
+rain,medium,high,weak,yes
+rain,cold,normal,weak,yes
+rain,cold,normal,force,no
+cloudy,cold,normal,force,yes
+sunny,medium,high,weak,no
+sunny,cold,normal,weak,yes
+rain,medium,normal,weak,yes
+sunny,medium,normal,force,yes
+cloudy,medium,high,force,yes
+cloudy,hot,normal,weak,yes
+rain,medium,high,force,no

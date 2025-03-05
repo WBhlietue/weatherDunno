@@ -1,0 +1,7 @@
+{
+    "weather": [
+        { "sunny": { "water": [{ "high": "NO" }, { "normal": "YES" }] } },
+        { "cloudy": "YES" },
+        { "rain": { "wind": [{ "weak": "YES" }, { "force": "NO" }] } }
+    ]
+}
