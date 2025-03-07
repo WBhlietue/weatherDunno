@@ -1,18 +1,18 @@
 import pandas
 import math
+import json
 
-data = pandas.read_csv("data.csv")
+# data = pandas.read_csv("data.csv").astype(str)
+nData = pandas.read_csv("dataC.csv").astype(str)
+data = nData[["Зориулалт","Үйлдвэрлэсэн он", "Тээврийн хэрэгслийн төрөл", "Үйлдвэрлэсэн улс"]]
+data['result'] = nData['Марк']
+texts = []
+for i in data:
+    texts.append(data[i].unique().tolist())
 
-texts = [
-    ["sunny", "cloudy", "rain"],
-    ["hot", "medium", "cold"],
-    ["high", "normal"],
-    ["weak", "force"],
-    ["no", "yes"]
-]
+# print(texts)
 
-findDatas = ["sunny", "medium", "high", "force"]
-
+headers = list(data.columns.values)
 def GetText(name, index):
     return texts[list(data.columns.values).index(name)][index]
 
@@ -27,18 +27,15 @@ index = 0
 for i in data:
     data[i] = data[i].map(GetTextJson(index))
     index+=1
-def CalculateEntropy(p, n):
-    total = p + n
-    if(p == 0 or n == 0):
-        return 0
-    return (-p / total * math.log2(p/total)) - (n/total * math.log2(n/total)) 
+    
 
 def CalculateTotal(table):
-    result = table["play"]
-    total = len(result)
-    p = result.sum()
-    n = total - p
-    return CalculateEntropy(p, n)
+    result = table["result"]
+    answer = 0
+    sets = result.value_counts(normalize=True)
+    for i in sets:
+        answer += -i * math.log2(i)
+    return answer
 
 totalEntropy = CalculateTotal(data)
 
@@ -48,20 +45,21 @@ def CalculateGain(table, name):
     for i in range(table[name].max()+1):
         newData = table.loc[table[name] == i]
         currentLength = len(newData)
-        p = newData["play"].sum()
-        n = currentLength - p
-        entro = CalculateEntropy(p, n)
-        #print(name, entro)
+        entro = CalculateTotal(newData)
         result +=  entro * (currentLength / totalLength)
     tE = CalculateTotal(table)
-    #print(result, tE - result, tE)
     return tE - result
         
+def GetValues(table):
+    value = table.value_counts(normalize=True).idxmax()[0]
+
+    return texts[-1][value]
+
 def GetMaxGain(table):
     headers = list(table.columns.values)
-    headers.remove("play")
-
+    headers.remove("result")
     entropies = []
+    
     for i in headers:
         entropies.append(CalculateGain(table, i))
     maxValue = max(entropies)
@@ -72,58 +70,81 @@ def StartCalculate(table):
     maxGain = GetMaxGain(table)
     results = []
     for i in range(table[maxGain].max()+1):
-        newTable = table.loc[table[maxGain] == i].drop([maxGain], axis=1)
-        if(newTable["play"].sum() == len(newTable)):
-            results.append({GetText(maxGain,i):"YES"})
-        elif(newTable["play"].sum() == 0):
-            results.append({GetText(maxGain,i):"NO"})
-        else:
-            results.append({GetText(maxGain,i):StartCalculate(newTable)})
+        if i in table[maxGain].values:
+            newTable = table.loc[table[maxGain] == i].drop([maxGain], axis=1)
+            if(newTable["result"].nunique() == 1):
+                results.append({GetText(maxGain,i):texts[-1][newTable["result"].iloc[0]]})
+            else:
+                if(len(list(newTable.keys())) == 1):
+                    results.append({GetText(maxGain,i):GetValues(newTable)})
+                    # print(newTable.value_counts(normalize=True))
+                else:
+                    results.append({GetText(maxGain,i):StartCalculate(newTable)})
     return {maxGain:results}
 
-print("total entropy = ", totalEntropy)
-
-answer = StartCalculate(data)
-
-# file = open("file.json", "w")
-# file.write(str(answer))
-
-def PrintJSON(data, prefix=""):
-    keys = list(data.keys())
-    for idx, key in enumerate(keys):
-        is_last = (idx == len(keys) - 1)
-        connector = "└── " if is_last else "├── "
-
-        print(prefix + connector + key)
-
-        next_prefix = prefix + ("    " if is_last else "│   ")
-        for j_idx, j in enumerate(data[key]):
-            j_key = list(j.keys())[0]
-            is_last_j = (j_idx == len(data[key]) - 1)
-            sub_connector = "└── " if is_last_j else "├── "
-            print(next_prefix + sub_connector + j_key)
-            if j[j_key] == "YES" or j[j_key] == "NO":
-                print(next_prefix  + "    " + "└── " + j[j_key]) 
-            else:
-                PrintJSON(j[j_key], next_prefix + ("    " if is_last_j else "│   "))
-PrintJSON(answer, "")
 
 
+def Start(findDatas):
+    answer = StartCalculate(data)
+    def Check(json, headers):
+        c = (list(json.keys()))[0]
+        value = findDatas[headers.index(c)]
+        d = json[c]
+        data = []
+        for i in d:
+            data.append((list(i.keys()))[0])
+        headers.remove(c)
+        findDatas.remove(value)
+        if(value not in data):
+            return "Error"
+        nextData = d[data.index(value)][value]
+        if(nextData in texts[-1]):
+            return nextData
+        return Check(nextData, headers)
+    def PrintJSON(data, prefix=""):
+        result = []
+        keys = list(data.keys())
+        for idx, key in enumerate(keys):
+            is_last = (idx == len(keys) - 1)
+            connector = "└── " if is_last else "├── "
+            result.append(prefix + connector + key)
+            next_prefix = prefix + ("    " if is_last else "│   ")
+            for j_idx, j in enumerate(data[key]):
+                j_key = list(j.keys())[0]
+                is_last_j = (j_idx == len(data[key]) - 1)
+                sub_connector = "└── " if is_last_j else "├── "
+                result.append(next_prefix + sub_connector + j_key)
+                if j[j_key] in texts[-1]:
+                    result.append(next_prefix + "    " + "└── " + j[j_key])
+                else:
+                    result.append(PrintJSON(j[j_key], next_prefix + ("    " if is_last_j else "│   ")))
+        return "\n".join(result)
 
-def Check(json, headers):
-    c = (list(json.keys()))[0]
-    value = findDatas[headers.index(c)]
-    d = json[c]
-    data = []
-    for i in d:
-        data.append((list(i.keys()))[0])
-    headers.remove(c)
-    findDatas.remove(value)
-    nextData = d[data.index(value)][value]
-    if(nextData == "YES" or nextData == "NO"):
-        return nextData
-    return Check(nextData, headers)
+    result = Check(answer, list(data.columns.values))
+    return result, PrintJSON(answer)
 
-print("find =", findDatas)
-result = Check(answer, list(data.columns.values))
-print(result)
+if __name__ == "__main__":
+
+    print("total entropy = ", totalEntropy)
+    answer = StartCalculate(data)
+    file = open("file.json", "w",encoding="utf-8")
+    file.write(str(json.dumps(answer, ensure_ascii=False)))
+
+    def PrintJSON(data, prefix=""):
+        keys = list(data.keys())
+        for idx, key in enumerate(keys):
+            is_last = (idx == len(keys) - 1)
+            connector = "└── " if is_last else "├── "
+            print(prefix + connector + key)
+            next_prefix = prefix + ("    " if is_last else "│   ")
+            for j_idx, j in enumerate(data[key]):
+                j_key = list(j.keys())[0]
+                is_last_j = (j_idx == len(data[key]) - 1)
+                sub_connector = "└── " if is_last_j else "├── "
+                print(next_prefix + sub_connector + (j_key))
+                if j[j_key] in texts[-1]:
+                    print(next_prefix  + "    " + "└── " + j[j_key]) 
+                else:
+                    PrintJSON(j[j_key], next_prefix + ("    " if is_last_j else "│   "))
+    
+    PrintJSON(answer, "")
