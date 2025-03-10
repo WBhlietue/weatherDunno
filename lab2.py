@@ -1,8 +1,5 @@
 import pandas
 
-data = pandas.read_csv("data.csv")
-
-
 # data = pandas.read_csv("data.csv").astype(str)
 nData = pandas.read_csv("dataC.csv").astype(str)
 data = nData[["Зориулалт","Үйлдвэрлэсэн он", "Тээврийн хэрэгслийн төрөл", "Үйлдвэрлэсэн улс"]]

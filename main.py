@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 import lab1
 import lab2 
+import lab3
 
 root = tk.Tk()
 root.title("Dunno")
@@ -49,8 +50,13 @@ def Click2():
     res = lab2.Start(l)
     OpenNewWindow1(res)
 def Click3():
+    l = []
     for i in selected_option:
-        print(i.get())
+        l.append(i.get())
+    res = lab3.Start(l)
+    name = res[0][0]
+    res = "\n".join([f"{i[0]:<22}:{i[1]:<15.10}" for i in res])
+    OpenNewWindow1((name,res))
 
 button1 = tk.Button(root, text="Lab 1", command=Click1)
 button1.place(x = 50,y = 300)
