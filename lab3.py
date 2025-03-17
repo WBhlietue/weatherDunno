@@ -34,7 +34,6 @@ def IsSame(row, line):
     return True
 
 def CalculateSupport(line):
-    print(line)
     countTotal = 0
     resultCount = len(data["result"].unique().tolist())
     count = [0] * resultCount
@@ -42,6 +41,7 @@ def CalculateSupport(line):
         if(IsSame(row, line)):
             count[row["result"]]+=1
             countTotal+=1
+    # print(count)
     return (count, countTotal+0.0001)
         
 
@@ -50,11 +50,11 @@ def Start(findDatas):
     count, countTotal = CalculateSupport(findDatas)
     answer = []
     for i in range(len(count)):
+        # print(count[i]/countTotal, count[i], countTotal)
         answer.append((GetText("result", i), count[i]/countTotal))
     answer = sorted(answer, key=lambda x: x[1], reverse=True)
     return answer
     
 if __name__ == "__main__":
-    # print(Start([0, 3, 35, 0]))
-    print(data)
-    print(data.loc[data['Зориулалт'] == 0].loc[data["Үйлдвэрлэсэн он"] == 3].loc[data["Тээврийн хэрэгслийн төрөл"] == 35])
+    print(Start([0, 0, 0, 0]))
+    # print(data)

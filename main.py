@@ -65,5 +65,4 @@ button2.place(x = 150,y = 300)
 button3 = tk.Button(root, text="Lab 3", command=Click3)
 button3.place(x = 250,y = 300)
 
-
 root.mainloop()
