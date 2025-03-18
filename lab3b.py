@@ -1,28 +1,30 @@
-import server
-# data = pandas.read_csv("data.csv").astype(str)
+import pandas
+
+
+data = pandas.read_csv("data.csv").astype(str)
 # nData = pandas.read_csv("dataC.csv").astype(str)
 # data = nData[["Зориулалт","Үйлдвэрлэсэн он", "Тээврийн хэрэгслийн төрөл", "Үйлдвэрлэсэн улс"]]
 # data['result'] = nData['Марк']
-
-db = server.db
-cur = db.cursor()
-headers = server.headers
-tableName = server.tableName
 texts = []
+for i in data:
+    texts.append(data[i].unique().tolist())
 
-for i in headers:
-    cur.execute(f"select distinct {i} from weather;")
-    a = cur.fetchall()
-    p = []
-    for j in a:
-        p.append(j[0])
-    texts.append(p)
-def GetLength(where):
-    w = ""
-    if(len(where) != 0):
-        w = "where " + " and ".join(where)
-    cur.execute(f"select count(*) from {tableName} {w}")
-    return cur.fetchall()[0][0]
+def GetText(name, index):
+    return texts[list(data.columns.values).index(name)][index]
+
+def GetTextJson(index):
+    row = texts[index]
+    json = {}
+    for i in range(len(row)):
+        json[row[i]] = i
+    return json
+
+index = 0
+for i in data:
+    data[i] = data[i].map(GetTextJson(index))
+    index+=1
+
+heads = list(data.columns.values)
 
 def IsSame(row, line):
     for i in range(len(line)):
@@ -31,16 +33,11 @@ def IsSame(row, line):
             return False
     return True
 
-def GetText(name, index):
-    return texts[headers.index(name)][index]
-
 def CalculateSupport(line):
     countTotal = 0
-    cur.execute(f'select distinct {headers[-1]} from {tableName}')
-    resultCount = len(cur.fetchall())
+    resultCount = len(data["result"].unique().tolist())
     count = [0] * resultCount
-    cur.execute(f'select {", ".join(headers)} from {tableName}')
-    for row in cur.fetchall():
+    for _, row in data.iterrows():
         if(IsSame(row, line)):
             count[row["result"]]+=1
             countTotal+=1
@@ -52,10 +49,10 @@ def Start(findDatas):
     count, countTotal = CalculateSupport(findDatas)
     answer = []
     for i in range(len(count)):
+        # print(count[i]/countTotal, count[i], countTotal)
         answer.append((GetText("result", i), count[i]/countTotal))
     answer = sorted(answer, key=lambda x: x[1], reverse=True)
     return answer
     
 if __name__ == "__main__":
-    print(Start(["sunny","medium","normal","force"]))
-    # print(data)
+    print(Start([0, 0, 0, 0]))

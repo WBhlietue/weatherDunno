@@ -1,26 +1,20 @@
+import pandas
 import math
-import server
+import json
 
-# data = pandas.read_csv("data.csv").astype(str)
+data = pandas.read_csv("data.csv").astype(str)
 # nData = pandas.read_csv("dataC.csv").astype(str)
 # data = nData[["Зориулалт","Үйлдвэрлэсэн он", "Тээврийн хэрэгслийн төрөл", "Үйлдвэрлэсэн улс"]]
 # data['result'] = nData['Марк']
-db = server.db
-cur = db.cursor()
-headers = server.headers
-tableName = server.tableName
 texts = []
+for i in data:
+    texts.append(data[i].unique().tolist())
 
-for i in headers:
-    cur.execute(f"select distinct {i} from weather;")
-    a = cur.fetchall()
-    p = []
-    for j in a:
-        p.append(j[0])
-    texts.append(p)
+# print(texts)
 
+headers = list(data.columns.values)
 def GetText(name, index):
-    return texts[headers.index(name)][index]
+    return texts[list(data.columns.values).index(name)][index]
 
 def GetTextJson(index):
     row = texts[index]
@@ -29,107 +23,74 @@ def GetTextJson(index):
         json[row[i]] = i
     return json
 
-def CalculateTotal(where=[]):
+index = 0
+for i in data:
+    data[i] = data[i].map(GetTextJson(index))
+    index+=1
+    
+
+def CalculateTotal(table):
+    result = table["result"]
     answer = 0
-    w = ""
-    if(len(where) != 0):
-        w = "where " + " and ".join(where)
-    cur.execute(f"select {headers[-1]}, count(*) / sum(count(*)) over() from {tableName} {w} group by {headers[-1]};")
-    res = cur.fetchall()
-    # sets = result.value_counts(normalize=True)
-    sets = [0]*len(texts[-1])
-    for i in res:
-        sets[texts[-1].index(i[0])] = float(i[1])
+    sets = result.value_counts(normalize=True)
     for i in sets:
-        if(i == 0):
-            continue
         answer += -i * math.log2(i)
     return answer
 
-totalEntropy = CalculateTotal()
+totalEntropy = CalculateTotal(data)
 
-def GetLength(where):
-    w = ""
-    if(len(where) != 0):
-        w = "where " + " and ".join(where)
-    cur.execute(f"select count(*) from {tableName} {w}")
-    return cur.fetchall()[0][0]
-
-
-def CalculateGain(name, where=[]):
+def CalculateGain(table, name):
     result = 0
-    w = ""
-    if(len(where) != 0):
-        w = "where " + " and ".join(where)
-    
-    totalLength = GetLength(where)
-    cur.execute(f"select distinct {name} from {tableName} {w}")
-    maxValue = len(cur.fetchall())
-    for i in range(maxValue):
-        newWhere = where.copy()
-        newWhere.append(f'{name} = "{texts[headers.index(name)][i]}"')
-
-        currentLength = GetLength(newWhere)
-        entro = CalculateTotal(newWhere)
+    totalLength = len(table)
+    for i in range(table[name].max()+1):
+        newData = table.loc[table[name] == i]
+        currentLength = len(newData)
+        entro = CalculateTotal(newData)
         result +=  entro * (currentLength / totalLength)
-    tE = CalculateTotal(where)
+    tE = CalculateTotal(table)
     return tE - result
         
-def GetValues(where):
-    w = ""
-    if(len(where) >0):
-        w = "where " + " and ".join(where)
-    cur.execute(f"select {headers[-1]} from {tableName} {w} group by {headers[-1]} ORDER BY count({headers[-1]}) desc")
-    a = cur.fetchall()
-    return a[0][0]
+def GetValues(table):
+    value = table.value_counts(normalize=True).idxmax()[0]
 
-def GetMaxGain(head,where=[]):
-    newHeaders = head.copy()
-    newHeaders.remove("result")
+    return texts[-1][value]
+
+def GetMaxGain(table):
+    headers = list(table.columns.values)
+    headers.remove("result")
     entropies = []
     
-    for i in newHeaders:
-        entropies.append(CalculateGain(i,where))
+    for i in headers:
+        entropies.append(CalculateGain(table, i))
     maxValue = max(entropies)
     index = entropies.index(maxValue)
-    return newHeaders[index]
+    return headers[index]
 
-def StartCalculate(head,where=[], dropped=0):
-    maxGain = GetMaxGain(head,where)
+def StartCalculate(table,d=0):
+    maxGain = GetMaxGain(table)
     results = []
-    w = ""
-    if(len(where) != 0):
-        w = "where " + " and ".join(where)
-    cur.execute(f"select distinct {maxGain} from {tableName}")
-    size = cur.fetchall()
-    size = len(size)
-    # print(range(size), maxGain)
-    for i in range(size):
-        if i < len(texts[headers.index(maxGain)]):
-            # newTable = table.loc[table[maxGain] == i].drop([maxGain], axis=1)
-            h = head.copy()
-            # print(h, head)
-            h.remove(maxGain)
-            dropped+=1
-            newWhere = where.copy()
-            newWhere.append(f'{maxGain} = "{GetText(maxGain,i)}"')
-            cur.execute(f"select count(distinct result) from {tableName} where {' and '.join(newWhere)}")
-            r = cur.fetchall()[0][0]
-            if(r == 1):
-                cur.execute(f"select result from {tableName} where {' and '.join(newWhere)}")
-                res = cur.fetchall()[0][0]
-                results.append({GetText(maxGain,i):res})
+    print(table[maxGain])
+    for i in range(table[maxGain].max()+1):
+        if i in table[maxGain].values:
+            d+=1
+            newTable = table.loc[table[maxGain] == i].drop([maxGain], axis=1)
+            if(newTable["result"].nunique() == 1):
+                results.append({GetText(maxGain,i):texts[-1][newTable["result"].iloc[0]]})
             else:
-                if(len(headers)==1):
-                    results.append({GetText(maxGain,i):GetValues(newWhere)})
+                print(d, len(headers),len(list(newTable.keys())))
+                if(len(list(newTable.keys())) == 1):
+                    results.append({GetText(maxGain,i):GetValues(newTable)})
+                    # print(newTable.value_counts(normalize=True))
                 else:
-                    results.append({GetText(maxGain,i):StartCalculate(h,newWhere, dropped)})
+                    print("f")
+                    results.append({GetText(maxGain,i):StartCalculate(newTable,d)})
     return {maxGain:results}
 
-answer = StartCalculate(headers)
+print(StartCalculate(data))
+
 def Start(findDatas):
+    answer = StartCalculate(data)
     def Check(json, headers):
-        headers = headers.copy()
         c = (list(json.keys()))[0]
         value = findDatas[headers.index(c)]
         d = json[c]
@@ -163,7 +124,7 @@ def Start(findDatas):
                     result.append(PrintJSON(j[j_key], next_prefix + ("    " if is_last_j else "│   ")))
         return "\n".join(result)
 
-    result = Check(answer, headers)
+    result = Check(answer, list(data.columns.values))
     return result, PrintJSON(answer)
 
 # if __name__ == "__main__":
